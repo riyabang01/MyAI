@@ -18,7 +18,8 @@ function App() {
   const [pushingGithub, setPushingGithub] = useState(false)
   const [githubUrl, setGithubUrl] = useState('')
 
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000/api/projects'
+  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5000/api/projects' : '/api/projects')
+
 
   useEffect(() => {
     axios
