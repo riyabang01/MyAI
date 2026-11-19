@@ -12,11 +12,8 @@ function getAI() {
 }
 
 const FREE_MODELS = [
-  'gemini-3.8-flash',
   'gemini-3.5-flash-lite',
-  'gemini-2.5-flash',
-  'gemini-2.5-flash-lite',
-  'gemini-2.0-flash'
+  'gemini-3.8-flash'
 ];
 
 async function fetchExactWikimediaImage(query) {
@@ -108,7 +105,7 @@ async function generateWithFallback(promptText) {
         contents: promptText,
         config: {
           responseMimeType: 'application/json',
-          maxOutputTokens: 65536,
+          maxOutputTokens: 32768,
         },
       });
       const rawText = response.text.replace(/```json/gi, '').replace(/```/g, '').trim();
@@ -123,11 +120,12 @@ async function generateWithFallback(promptText) {
 
 export async function generateStructuredMERNProject(prompt) {
   const systemPrompt = `You are a Senior Full-Stack MERN Architect & UI/UX Engineer. 
-Analyze the user's request and generate a clean, modular, production-ready MERN Stack project tailored specifically to the requested app domain (whether it is a Dashboard, SaaS, Blog, Task Manager, Expense Tracker, Chat App, Booking System, Portfolio, or E-Commerce Store).
+Analyze the user's request and generate a complete, full-featured, production-ready MERN Stack project tailored specifically to the requested app domain (whether it is a Dashboard, SaaS, Blog, Task Manager, Expense Tracker, Chat App, Booking System, Portfolio, or E-Commerce Store).
 
-STRICT MODULAR ARCHITECTURE RULES:
-1. NEVER put all code in a single big file. Split code into small, clean, feature-named files matching the exact domain of the user's request.
-2. Include BOTH "client/" and "server/" folders plus root "vercel.json":
+STRICT MODULAR ARCHITECTURE & FULL CODE RULES:
+1. Write COMPLETE, working code in every file—NEVER use placeholders like "// TODO" or "// add code here".
+2. Split code into clean, modular, feature-named files matching the exact domain of the user's request.
+3. Include BOTH "client/" and "server/" folders plus root "vercel.json":
    - vercel.json (routes /api/(.*) to server/server.js and /(.*) to client)
    - client/package.json (react, react-dom, axios, lucide-react, vite, @vitejs/plugin-react, tailwindcss, postcss, autoprefixer, "build": "vite build")
    - client/vite.config.js
@@ -139,7 +137,7 @@ STRICT MODULAR ARCHITECTURE RULES:
    - client/src/utils/api.js (axios instance)
    - client/src/components/ui/ (generic reusable UI primitives like Navbar.jsx or Sidebar.jsx, Modal.jsx, Badge.jsx, StatCard.jsx as needed by the app type)
    - client/src/components/ (2-3 domain-specific components matching the user's app, e.g., ExpenseTable.jsx, PostCard.jsx, TaskBoard.jsx, BookingForm.jsx)
-   - client/src/App.jsx (clean structured layout tailored to the app's real-world UX)
+   - client/src/App.jsx (complete structured layout tailored to the app's real-world UX)
    - server/package.json ("type": "module", express, mongoose, cors, dotenv, "start": "node server.js")
    - server/config/db.js
    - server/models/<DomainModel>.js
@@ -148,9 +146,9 @@ STRICT MODULAR ARCHITECTURE RULES:
    - server/server.js (must include "export default app;" for Vercel)
 
 DOMAIN-APPROPRIATE UI & CONDITIONAL IMAGES RULE:
-3. Use "lucide-react" icons and modern Tailwind CSS styling suited to the app's tone (e.g., clean data tables & KPI cards for finance/admin dashboards; cards & modals for content/booking/store apps).
-4. ONLY include images when the app domain naturally uses visuals (e.g., E-commerce, Grocery, Food, Blog, Travel, Real Estate, Social, Portfolio). Do NOT force product photos into text-based apps like Calculators, Expense Trackers, or Todo Lists.
-5. Whenever images ARE used, populate realistic sample items and write every image URL as: "IMAGE_QUERY:<Exact Subject Name>" (e.g., "IMAGE_QUERY:Red Apple fruit", "IMAGE_QUERY:Taj Mahal", "IMAGE_QUERY:Modern office desk"). Add an onError fallback on every <img> tag.
+4. Use "lucide-react" icons and modern Tailwind CSS styling suited to the app's tone (e.g., clean data tables & KPI cards for finance/admin dashboards; cards & modals for content/booking/store apps).
+5. ONLY include images when the app domain naturally uses visuals (e.g., E-commerce, Grocery, Food, Blog, Travel, Real Estate, Social, Portfolio). Do NOT force product photos into text-based apps like Calculators, Expense Trackers, or Todo Lists.
+6. Whenever images ARE used, populate realistic sample items and write every image URL as: "IMAGE_QUERY:<Exact Subject Name>" (e.g., "IMAGE_QUERY:Red Apple fruit", "IMAGE_QUERY:Taj Mahal", "IMAGE_QUERY:Modern office desk"). Add an onError fallback on every <img> tag.
 
 Return ONLY raw valid JSON:
 {
@@ -177,7 +175,7 @@ Existing project files: ${JSON.stringify(existingFiles)}
 User requested changes or new files: "${editPrompt}"
 
 IMPORTANT RULES:
-1. Return ONLY the files that were modified or newly created. Return the complete code for each modified/new file.
+1. Return ONLY the files that were modified or newly created. Return the complete working code for each modified/new file.
 2. Keep the exact same "path" string when updating an existing file (e.g., "client/src/App.jsx").
 3. Maintain the modular component structure (client/src/components/ui/, lucide-react icons, responsive Tailwind layouts).
 4. If adding any visual items/cards that require photos, use "IMAGE_QUERY:<Exact Subject Name>" so our backend resolves exact photos.
