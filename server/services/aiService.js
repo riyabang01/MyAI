@@ -3,7 +3,13 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+function getAI() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is missing in environment variables');
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
 const FREE_MODELS = [
   'gemini-2.5-flash',
@@ -34,7 +40,7 @@ async function fetchExactWikimediaImage(query) {
     const pages = data?.query?.pages;
 
     if (pages) {
-      const firstPage = Object.values(pages);
+      const firstPage = Object.values(pages)[0];
       if (firstPage?.thumbnail?.source) {
         return firstPage.thumbnail.source;
       }
@@ -57,8 +63,8 @@ async function resolveExactImagesInFiles(files) {
     const matches = [...file.code.matchAll(regex)];
 
     for (const match of matches) {
-      const fullPlaceholder = match;
-      const searchKeyword = match.trim();
+      const fullPlaceholder = match[0];
+      const searchKeyword = match[1].trim();
 
       if (!cache.has(searchKeyword)) {
         const exactUrl = await fetchExactWikimediaImage(searchKeyword);
@@ -73,6 +79,7 @@ async function resolveExactImagesInFiles(files) {
 }
 
 export async function generateRawText(promptText) {
+  const ai = getAI();
   let lastError;
   for (const modelName of FREE_MODELS) {
     try {
@@ -90,6 +97,7 @@ export async function generateRawText(promptText) {
 }
 
 async function generateWithFallback(promptText) {
+  const ai = getAI();
   let lastError;
   for (const modelName of FREE_MODELS) {
     try {
