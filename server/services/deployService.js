@@ -137,7 +137,8 @@ export async function deployProjectToVercel(project) {
       .replace(/^-+|-+$/g, '')
       .slice(0, 40) || 'mern-ai-app';
 
-  const deploymentName = `${cleanName}-${Date.now().toString().slice(-4)}`;
+  const deploymentName = `${cleanName}-${String(project._id || Date.now()).slice(-6)}`;
+
 
   if (hasClient && hasServer && serverEntry) {
     const serverFiles = vercelFiles.filter((f) => f.file.startsWith('server/'));
