@@ -1,3 +1,13 @@
+async function safeParseJson(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Invalid response (${response.status}): ${text.slice(0, 120)}`);
+  }
+}
+
 export async function pushProjectToGitHub(project) {
   const githubToken = process.env.GITHUB_TOKEN;
   if (!githubToken) {
@@ -10,7 +20,7 @@ export async function pushProjectToGitHub(project) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)}-${Date.now().toString().slice(-4)}`;
 
-  const githubApiBase = 'https://github.com';
+  const githubApiBase = 'https://api.github.com';
 
   const repoRes = await fetch(`${githubApiBase}/user/repos`, {
     method: 'POST',
@@ -27,7 +37,7 @@ export async function pushProjectToGitHub(project) {
     }),
   });
 
-  const repoData = await repoRes.json();
+  const repoData = await safeParseJson(repoRes);
   if (!repoRes.ok) {
     throw new Error(repoData.message || 'Failed to create GitHub repository');
   }
@@ -57,7 +67,7 @@ export async function pushProjectToGitHub(project) {
     );
 
     if (!fileRes.ok) {
-      const errData = await fileRes.json();
+      const errData = await safeParseJson(fileRes);
       console.warn(`Failed to push ${cleanPath}:`, errData.message);
     }
   }
@@ -210,7 +220,7 @@ export async function deployProjectToVercel(project) {
     }),
   });
 
-  const data = await response.json();
+  const data = await safeParseJson(response);
   if (!response.ok) {
     throw new Error(data.error?.message || 'Vercel deployment failed');
   }

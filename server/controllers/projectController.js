@@ -42,16 +42,25 @@ export const createProject = async (req, res) => {
 
 export const updateProject = async (req, res) => {
   try {
-    const { editPrompt, existingFiles, manualFiles } = req.body;
+    const { editPrompt, existingFiles, manualFiles, liveUrl } = req.body;
     const project = await Project.findById(req.params.id);
 
     if (!project) {
       return res.status(404).json({ error: 'Project not found' });
     }
 
+    if (liveUrl !== undefined && !editPrompt && !manualFiles) {
+      project.liveUrl = liveUrl;
+      await project.save();
+      return res.status(200).json({ success: true, project });
+    }
+
     if (manualFiles) {
       project.files = manualFiles;
       project.generatedCode = manualFiles.map((f) => `// === ${f.path} ===\n${f.code}`).join('\n\n');
+      if (liveUrl !== undefined) {
+        project.liveUrl = liveUrl;
+      }
       await project.save();
       return res.status(200).json({ success: true, project });
     }
