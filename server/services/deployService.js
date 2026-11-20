@@ -82,6 +82,19 @@ export async function deployProjectToVercel(project) {
     throw new Error('VERCEL_TOKEN missing in backend .env file');
   }
 
+  let teamId = process.env.VERCEL_TEAM_ID || '';
+  if (!teamId) {
+    const userRes = await fetch('https://vercel.com', {
+      headers: {
+        Authorization: `Bearer ${vercelToken}`,
+      },
+    });
+    if (userRes.ok) {
+      const userData = await safeParseJson(userRes);
+      teamId = userData.user?.defaultTeamId || '';
+    }
+  }
+
   const rawFiles = (project.files || [])
     .map((file) => ({
       file: String(file.path || '').replace(/^\/+/, ''),
@@ -216,14 +229,24 @@ export async function deployProjectToVercel(project) {
     };
   }
 
-  const response = await fetch('https://vercel.com', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${vercelToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
+  const queryParams = new URLSearchParams({
+    skipAutoDetectionConfirmation: '1',
   });
+  if (teamId) {
+    queryParams.set('teamId', teamId);
+  }
+
+  const response = await fetch(
+    `https://vercel.com{queryParams.toString()}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${vercelToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    }
+  );
 
   const data = await safeParseJson(response);
   if (!response.ok) {
