@@ -110,7 +110,7 @@ export async function deployProjectToVercel(project) {
   );
 
   let vercelFiles = [...rawFiles];
-  let payload = {};
+  let projectSettings = {};
 
   const cleanName =
     (project.name || 'mern-ai-app')
@@ -123,15 +123,22 @@ export async function deployProjectToVercel(project) {
   const deploymentName = `${cleanName}-${Date.now().toString().slice(-4)}`;
 
   if (hasClient && hasServer && serverEntry) {
+    const serverFiles = vercelFiles.filter((f) => f.file.startsWith('server/'));
+    const serverPkgFile = serverFiles.find((f) => f.file === 'server/package.json');
+    let serverDeps = { express: '^4.19.2', cors: '^2.8.5', dotenv: '^16.4.5', mongoose: '^8.5.0' };
+    if (serverPkgFile) {
+      try {
+        const parsedServerPkg = JSON.parse(serverPkgFile.data);
+        serverDeps = { ...serverDeps, ...(parsedServerPkg.dependencies || {}) };
+      } catch {}
+    }
+
     vercelFiles = vercelFiles.map((f) => {
       if (f.file === 'client/package.json') {
         try {
-          const pkg = JSON.parse(f.data);
-          pkg.scripts = pkg.scripts || {};
-          if (!pkg.scripts['vercel-build']) {
-            pkg.scripts['vercel-build'] = pkg.scripts.build || 'vite build';
-          }
-          return { file: f.file, data: JSON.stringify(pkg, null, 2) };
+          const clientPkg = JSON.parse(f.data);
+          clientPkg.dependencies = { ...serverDeps, ...(clientPkg.dependencies || {}) };
+          return { file: f.file, data: JSON.stringify(clientPkg, null, 2) };
         } catch {
           return f;
         }
@@ -139,24 +146,19 @@ export async function deployProjectToVercel(project) {
       return f;
     });
 
+    vercelFiles.push({
+      file: 'api/index.js',
+      data: `import app from '../${serverEntry.file}';\nexport default app;\n`,
+    });
+
     vercelFiles = vercelFiles.filter((f) => f.file !== 'vercel.json');
     vercelFiles.push({
       file: 'vercel.json',
       data: JSON.stringify(
         {
-          version: 2,
-          builds: [
-            { src: serverEntry.file, use: '@vercel/node' },
-            {
-              src: 'client/package.json',
-              use: '@vercel/static-build',
-              config: { distDir: 'dist' },
-            },
-          ],
-          routes: [
-            { src: '/api/(.*)', dest: `/${serverEntry.file}` },
-            { handle: 'filesystem' },
-            { src: '/(.*)', dest: '/client/dist/index.html' },
+          rewrites: [
+            { source: '/api/(.*)', destination: '/api/index.js' },
+            { source: '/(.*)', destination: '/index.html' },
           ],
         },
         null,
@@ -164,10 +166,11 @@ export async function deployProjectToVercel(project) {
       ),
     });
 
-    payload = {
-      name: deploymentName,
-      files: vercelFiles,
-      target: 'production',
+    projectSettings = {
+      framework: 'vite',
+      installCommand: 'cd client && npm install',
+      buildCommand: 'cd client && npm run build',
+      outputDirectory: 'client/dist',
     };
   } else {
     if (hasClient) {
@@ -233,16 +236,11 @@ export async function deployProjectToVercel(project) {
       ),
     });
 
-    payload = {
-      name: deploymentName,
-      files: vercelFiles,
-      target: 'production',
-      projectSettings: {
-        framework: 'vite',
-        buildCommand: 'npm run build',
-        outputDirectory: 'dist',
-        installCommand: 'npm install',
-      },
+    projectSettings = {
+      framework: 'vite',
+      buildCommand: 'npm run build',
+      outputDirectory: 'dist',
+      installCommand: 'npm install',
     };
   }
 
@@ -261,7 +259,12 @@ export async function deployProjectToVercel(project) {
         Authorization: `Bearer ${vercelToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        name: deploymentName,
+        files: vercelFiles,
+        target: 'production',
+        projectSettings,
+      }),
     }
   );
 
