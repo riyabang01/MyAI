@@ -123,6 +123,22 @@ export async function deployProjectToVercel(project) {
   const deploymentName = `${cleanName}-${Date.now().toString().slice(-4)}`;
 
   if (hasClient && hasServer && serverEntry) {
+    vercelFiles = vercelFiles.map((f) => {
+      if (f.file === 'client/package.json') {
+        try {
+          const pkg = JSON.parse(f.data);
+          pkg.scripts = pkg.scripts || {};
+          if (!pkg.scripts['vercel-build']) {
+            pkg.scripts['vercel-build'] = pkg.scripts.build || 'vite build';
+          }
+          return { file: f.file, data: JSON.stringify(pkg, null, 2) };
+        } catch {
+          return f;
+        }
+      }
+      return f;
+    });
+
     vercelFiles = vercelFiles.filter((f) => f.file !== 'vercel.json');
     vercelFiles.push({
       file: 'vercel.json',
@@ -255,6 +271,28 @@ export async function deployProjectToVercel(project) {
       data.error?.message ||
       (data.error ? JSON.stringify(data.error) : `HTTP ${response.status} from Vercel`);
     throw new Error(`Vercel Error: ${detailedError}`);
+  }
+
+  const deploymentId = data.id;
+  if (deploymentId) {
+    for (let i = 0; i < 15; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      const statusUrl = teamId
+        ? `${VERCEL_API}/v13/deployments/${deploymentId}?teamId=${teamId}`
+        : `${VERCEL_API}/v13/deployments/${deploymentId}`;
+      const statusRes = await fetch(statusUrl, {
+        headers: { Authorization: `Bearer ${vercelToken}` },
+      });
+      if (statusRes.ok) {
+        const statusData = await safeParseJson(statusRes);
+        if (statusData.readyState === 'READY') {
+          break;
+        }
+        if (statusData.readyState === 'ERROR' || statusData.readyState === 'CANCELED') {
+          throw new Error(`Vercel Build Failed: ${statusData.errorMessage || 'Check Vercel build logs'}`);
+        }
+      }
+    }
   }
 
   return `https://${data.url}`;
