@@ -22,33 +22,23 @@ export const downloadProjectZip = async (project) => {
   URL.revokeObjectURL(url)
 }
 
-export const openProjectInVSCode = (project) => {
-  if (!project || !project.files) return
-  const form = document.createElement('form')
-  form.method = 'POST'
-  form.action = 'https://stackblitz.com'
-  form.target = '_blank'
+export const openProjectInVSCode = async (project, githubUrl = '', onPushGithub = null) => {
+  let repoUrl = githubUrl || project?.githubUrl
 
-  const addInput = (name, value) => {
-    const input = document.createElement('input')
-    input.type = 'hidden'
-    input.name = name
-    input.value = value
-    form.appendChild(input)
+  if (!repoUrl && typeof onPushGithub === 'function') {
+    const pushedUrl = await onPushGithub()
+    if (typeof pushedUrl === 'string') {
+      repoUrl = pushedUrl
+    }
   }
 
-  addInput('project[title]', project.name || 'MERN AI Project')
-  addInput('project[description]', project.prompt || 'Generated MERN Stack App')
-  addInput('project[template]', 'node')
+  if (!repoUrl) {
+    alert('Please push the project to GitHub first to open it in VS Code.')
+    return
+  }
 
-  project.files.forEach((file) => {
-    const cleanPath = file.path.replace(/^\/+/, '')
-    addInput(`project[files][${cleanPath}]`, file.code || '')
-  })
-
-  document.body.appendChild(form)
-  form.submit()
-  document.body.removeChild(form)
+  const cleanRepo = repoUrl.replace(/^https?:\/\//, '')
+  window.open('https://vscode.dev' + cleanRepo, '_blank', 'noopener,noreferrer')
 }
 
 export const buildLivePreviewHtml = (files) => {
@@ -67,36 +57,20 @@ export const buildLivePreviewHtml = (files) => {
     .replace(/export\s+default\s+function\s+App/g, 'function App')
     .replace(/export\s+default\s+App;?/g, '')
 
-  return `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="UTF-8" />
-        <script src="https://tailwindcss.com"></script>
-        <script src="https://unpkg.com"></script>
-        <script src="https://unpkg.com"></script>
-        <script src="https://unpkg.com"></script>
-        <style>${cssFile ? cssFile.code : ''} body { background: #09090b; color: #f4f4f5; font-family: sans-serif; }</style>
-      </head>
-      <body>
-        <div id="root"></div>
-        <script type="text/babel">
-          const { useState, useEffect, useRef } = React;
-          const axios = {
-            get: () => Promise.resolve({ data: [] }),
-            post: (_, payload) => Promise.resolve({ data: { _id: Date.now(), ...payload } }),
-            put: (_, payload) => Promise.resolve({ data: payload }),
-            delete: () => Promise.resolve({ data: { success: true } })
-          };
-          try {
-            ${rawCode}
-            const root = ReactDOM.createRoot(document.getElementById('root'));
-            root.render(<App />);
-          } catch (err) {
-            document.getElementById('root').innerHTML = '<pre style="color:#f87171;padding:20px;">Preview Error: ' + err.message + '</pre>';
-          }
-        </script>
-      </body>
-    </html>
-  `
+  return (
+    '<!DOCTYPE html><html><head><meta charset="UTF-8" />' +
+    '<script src="https://cdn.tailwindcss.com"></script>' +
+    '<script src="https://unpkg.com" crossorigin></script>' +
+    '<script src="https://unpkg.com" crossorigin></script>' +
+    '<script src="https://unpkg.com"></script>' +
+    '<style>' + (cssFile ? cssFile.code : '') + ' body { background: #09090b; color: #f4f4f5; font-family: sans-serif; }</style>' +
+    '</head><body><div id="root"></div><script type="text/babel">' +
+    'const { useState, useEffect, useRef } = React;' +
+    'const axios = { get: () => Promise.resolve({ data: [] }), post: (_, payload) => Promise.resolve({ data: { _id: Date.now(), ...payload } }), put: (_, payload) => Promise.resolve({ data: payload }), delete: () => Promise.resolve({ data: { success: true } }) };' +
+    'try {' +
+    rawCode +
+    '\nconst root = ReactDOM.createRoot(document.getElementById("root")); root.render(<App />);' +
+    '} catch (err) { document.getElementById("root").innerHTML = \'<pre style="color:#f87171;padding:20px;">Preview Error: \' + err.message + \'</pre>\'; }' +
+    '</script></body></html>'
+  )
 }
