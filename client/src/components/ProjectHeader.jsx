@@ -13,6 +13,9 @@ function ProjectHeader({
   githubUrl,
   onDelete,
 }) {
+  const activeGithubUrl = githubUrl || project?.githubUrl;
+  const activeLiveUrl = liveUrl || project?.liveUrl;
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b border-neutral-800">
@@ -92,21 +95,21 @@ function ProjectHeader({
         </div>
       </div>
 
-      {githubUrl && (
+      {activeGithubUrl && (
         <div className="mb-4 p-4 rounded-2xl bg-neutral-800/70 border border-neutral-700 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="text-neutral-200 font-bold text-sm">🐙 GitHub Repo:</span>
             <a
-              href={githubUrl}
+              href={activeGithubUrl}
               target="_blank"
               rel="noreferrer"
               className="text-sm font-mono text-indigo-300 underline hover:text-indigo-200"
             >
-              {githubUrl}
+              {activeGithubUrl}
             </a>
           </div>
           <a
-            href={githubUrl}
+            href={activeGithubUrl}
             target="_blank"
             rel="noreferrer"
             className="px-4 py-1.5 rounded-xl bg-neutral-700 hover:bg-neutral-600 text-white text-xs font-semibold transition"
@@ -116,21 +119,21 @@ function ProjectHeader({
         </div>
       )}
 
-      {liveUrl && (
+      {activeLiveUrl && (
         <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="text-emerald-400 font-bold text-sm">🎉 Live on Vercel:</span>
             <a
-              href={liveUrl}
+              href={activeLiveUrl}
               target="_blank"
               rel="noreferrer"
               className="text-sm font-mono text-emerald-300 underline hover:text-emerald-200"
             >
-              {liveUrl}
+              {activeLiveUrl}
             </a>
           </div>
           <a
-            href={liveUrl}
+            href={activeLiveUrl}
             target="_blank"
             rel="noreferrer"
             className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"
