@@ -1,3 +1,6 @@
+const GITHUB_API = Buffer.from('aHR0cHM6Ly9hcGkuZ2l0aHViLmNvbQ==', 'base64').toString('utf-8');
+const VERCEL_API = Buffer.from('aHR0cHM6Ly9hcGkudmVyY2VsLmNvbQ==', 'base64').toString('utf-8');
+
 async function safeParseJson(response) {
   const text = await response.text();
   if (!text) return {};
@@ -21,9 +24,7 @@ export async function pushProjectToGitHub(project) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40) || 'mern-ai-project'}-${Date.now().toString().slice(-4)}`;
 
-  const githubApiBase = 'https://github.com';
-
-  const repoRes = await fetch(`${githubApiBase}/user/repos`, {
+  const repoRes = await fetch(`${GITHUB_API}/user/repos`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${githubToken}`,
@@ -52,7 +53,7 @@ export async function pushProjectToGitHub(project) {
     const base64Content = Buffer.from(String(file.code || ''), 'utf-8').toString('base64');
 
     const fileRes = await fetch(
-      `${githubApiBase}/repos/${owner}/${repoName}/contents/${cleanPath}`,
+      `${GITHUB_API}/repos/${owner}/${repoName}/contents/${cleanPath}`,
       {
         method: 'PUT',
         headers: {
@@ -84,7 +85,7 @@ export async function deployProjectToVercel(project) {
 
   let teamId = process.env.VERCEL_TEAM_ID || '';
   if (!teamId) {
-    const userRes = await fetch('https://vercel.com', {
+    const userRes = await fetch(`${VERCEL_API}/v2/user`, {
       headers: {
         Authorization: `Bearer ${vercelToken}`,
       },
@@ -237,7 +238,7 @@ export async function deployProjectToVercel(project) {
   }
 
   const response = await fetch(
-    `https://vercel.com{queryParams.toString()}`,
+    `${VERCEL_API}/v13/deployments?${queryParams.toString()}`,
     {
       method: 'POST',
       headers: {
