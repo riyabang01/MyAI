@@ -20,19 +20,52 @@ function App() {
 
   const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5000/api/projects' : '/api/projects')
 
+  const checkLiveUrlStatus = async (url) => {
+    if (!url) return false
+    try {
+      const res = await fetch(url)
+      return res.ok
+    } catch {
+      return false
+    }
+  }
 
   useEffect(() => {
     axios
       .get(BACKEND_URL)
-      .then((res) => setProjects(Array.isArray(res.data) ? res.data : []))
+      .then(async (res) => {
+        const list = Array.isArray(res.data) ? res.data : []
+        const verifiedList = await Promise.all(
+          list.map(async (proj) => {
+            if (!proj.liveUrl) return proj
+            const isAlive = await checkLiveUrlStatus(proj.liveUrl)
+            if (isAlive) return proj
+            axios.put(`${BACKEND_URL}/${proj._id}`, { manualFiles: proj.files, liveUrl: '' }).catch(() => {})
+            return { ...proj, liveUrl: '' }
+          })
+        )
+        setProjects(verifiedList)
+      })
       .catch((err) => console.error(err))
   }, [BACKEND_URL])
 
-  const openProject = (proj) => {
+  const openProject = async (proj) => {
     setSelectedProject(proj)
     setActiveTab('code')
-    setLiveUrl(proj.liveUrl || '')
     setGithubUrl(proj.githubUrl || '')
+    setLiveUrl('')
+
+    if (proj.liveUrl) {
+      const isAlive = await checkLiveUrlStatus(proj.liveUrl)
+      if (isAlive) {
+        setLiveUrl(proj.liveUrl)
+      } else {
+        const updatedProj = { ...proj, liveUrl: '' }
+        setSelectedProject(updatedProj)
+        setProjects((prev) => prev.map((p) => (p._id === proj._id ? updatedProj : p)))
+        axios.put(`${BACKEND_URL}/${proj._id}`, { manualFiles: proj.files, liveUrl: '' }).catch(() => {})
+      }
+    }
   }
 
   const handleSubmit = async (e) => {

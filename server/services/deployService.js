@@ -9,7 +9,7 @@ export async function pushProjectToGitHub(project) {
     .replace(/[^a-z0-9-]+/g, '-')
     .slice(0, 40)}-${Date.now().toString().slice(-4)}`;
 
-  const githubApiBase = ['https:/', 'api.github.com'].join('/');
+  const githubApiBase = ['https:/', '://github.com'].join('/');
 
   const repoRes = await fetch(`${githubApiBase}/user/repos`, {
     method: 'POST',
@@ -70,29 +70,120 @@ export async function deployProjectToVercel(project) {
 
   const vercelFiles = (project.files || []).map((file) => ({
     file: file.path.replace(/^\/+/, ''),
-    data: file.code,
+    data: file.code || '',
   }));
 
+  const hasClient = vercelFiles.some((f) => f.file.startsWith('client/'));
+  const hasServer = vercelFiles.some((f) => f.file.startsWith('server/'));
+  const serverEntry = vercelFiles.find(
+    (f) => f.file === 'server/server.js' || f.file === 'server/index.js'
+  );
   const hasVercelJson = vercelFiles.some((f) => f.file === 'vercel.json');
-  if (!hasVercelJson) {
-    vercelFiles.push({
-      file: 'vercel.json',
-      data: JSON.stringify(
-        {
-          version: 2,
-          builds: [
-            { src: 'server/server.js', use: '@vercel/node' },
-            { src: 'client/package.json', use: '@vercel/static-build', config: { distDir: 'dist' } },
-          ],
-          routes: [
-            { src: '/api/(.*)', dest: 'server/server.js' },
-            { src: '/(.*)', dest: 'client/$1' },
-          ],
-        },
-        null,
-        2
-      ),
-    });
+
+  let projectSettings = {
+    framework: 'vite',
+    buildCommand: 'npm run build',
+    outputDirectory: 'dist',
+    installCommand: 'npm install',
+  };
+
+  if (hasClient && hasServer && serverEntry) {
+    projectSettings = {
+      framework: null,
+      buildCommand: 'cd client && npm install && npm run build',
+      outputDirectory: 'client/dist',
+      installCommand: 'cd server && npm install',
+    };
+
+    if (!hasVercelJson) {
+      vercelFiles.push({
+        file: 'vercel.json',
+        data: JSON.stringify(
+          {
+            version: 2,
+            builds: [
+              { src: serverEntry.file, use: '@vercel/node' },
+              {
+                src: 'client/package.json',
+                use: '@vercel/static-build',
+                config: { distDir: 'dist' },
+              },
+            ],
+            rewrites: [
+              { source: '/api/(.*)', destination: `/${serverEntry.file}` },
+              { source: '/(.*)', destination: '/client/dist/index.html' },
+            ],
+          },
+          null,
+          2
+        ),
+      });
+    }
+  } else {
+    if (hasClient) {
+      vercelFiles.forEach((f) => {
+        if (f.file.startsWith('client/')) {
+          f.file = f.file.replace(/^client\//, '');
+        }
+      });
+    }
+
+    const hasPackageJson = vercelFiles.some((f) => f.file === 'package.json');
+    if (!hasPackageJson) {
+      vercelFiles.push({
+        file: 'package.json',
+        data: JSON.stringify(
+          {
+            name: 'vite-react-app',
+            private: true,
+            version: '0.0.0',
+            type: 'module',
+            scripts: {
+              dev: 'vite',
+              build: 'vite build',
+              preview: 'vite preview',
+            },
+            dependencies: {
+              react: '^18.3.1',
+              'react-dom': '^18.3.1',
+              'lucide-react': '^0.460.0',
+            },
+            devDependencies: {
+              '@vitejs/plugin-react': '^4.3.4',
+              autoprefixer: '^10.4.20',
+              postcss: '^8.4.49',
+              tailwindcss: '^3.4.15',
+              vite: '^6.0.1',
+            },
+          },
+          null,
+          2
+        ),
+      });
+    }
+
+    const hasViteConfig = vercelFiles.some(
+      (f) => f.file === 'vite.config.js' || f.file === 'vite.config.ts'
+    );
+    if (!hasViteConfig) {
+      vercelFiles.push({
+        file: 'vite.config.js',
+        data: `import { defineConfig } from 'vite'\nimport react from '@vitejs/plugin-react'\n\nexport default defineConfig({\n  plugins: [react()],\n})\n`,
+      });
+    }
+
+    if (!hasVercelJson) {
+      vercelFiles.push({
+        file: 'vercel.json',
+        data: JSON.stringify(
+          {
+            rewrites: [{ source: '/(.*)', destination: '/index.html' }],
+          },
+          null,
+          2
+        ),
+      });
+    }
   }
 
   const cleanName = (project.name || 'mern-ai-app')
@@ -100,7 +191,7 @@ export async function deployProjectToVercel(project) {
     .replace(/[^a-z0-9-]/g, '-')
     .slice(0, 40);
 
-  const vercelDeployEndpoint = ['https:/', 'api.vercel.com', 'v13', 'deployments'].join('/');
+  const vercelDeployEndpoint = ['https:/', '://vercel.com', 'v13', 'deployments'].join('/');
 
   const response = await fetch(vercelDeployEndpoint, {
     method: 'POST',
@@ -111,9 +202,8 @@ export async function deployProjectToVercel(project) {
     body: JSON.stringify({
       name: `${cleanName}-${Date.now().toString().slice(-4)}`,
       files: vercelFiles,
-      projectSettings: {
-        framework: null,
-      },
+      target: 'production',
+      projectSettings,
     }),
   });
 
