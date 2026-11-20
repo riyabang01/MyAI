@@ -20,7 +20,7 @@ export async function pushProjectToGitHub(project) {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)}-${Date.now().toString().slice(-4)}`;
 
-  const githubApiBase = 'https://api.github.com';
+  const githubApiBase = 'https://github.com';
 
   const repoRes = await fetch(`${githubApiBase}/user/repos`, {
     method: 'POST',
@@ -122,9 +122,10 @@ export async function deployProjectToVercel(project) {
                 config: { distDir: 'dist' },
               },
             ],
-            rewrites: [
-              { source: '/api/(.*)', destination: `/${serverEntry.file}` },
-              { source: '/(.*)', destination: '/client/dist/index.html' },
+            routes: [
+              { src: '/api/(.*)', dest: `/${serverEntry.file}` },
+              { handle: 'filesystem' },
+              { src: '/(.*)', dest: '/client/dist/index.html' },
             ],
           },
           null,
@@ -201,8 +202,10 @@ export async function deployProjectToVercel(project) {
 
   const cleanName = (project.name || 'mern-ai-app')
     .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .slice(0, 40);
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'mern-ai-app';
 
   const vercelDeployEndpoint = 'https://vercel.com';
 
@@ -222,7 +225,8 @@ export async function deployProjectToVercel(project) {
 
   const data = await safeParseJson(response);
   if (!response.ok) {
-    throw new Error(data.error?.message || 'Vercel deployment failed');
+    console.error('Vercel API Error:', JSON.stringify(data));
+    throw new Error(data.error?.message || JSON.stringify(data.error) || 'Vercel deployment failed');
   }
 
   return `https://${data.url}`;
