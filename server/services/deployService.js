@@ -4,7 +4,7 @@ async function safeParseJson(response) {
   try {
     return JSON.parse(text);
   } catch {
-    throw new Error(`Invalid response (${response.status}): ${text.slice(0, 120)}`);
+    throw new Error(`Invalid response (${response.status}): ${text.slice(0, 150)}`);
   }
 }
 
@@ -17,8 +17,9 @@ export async function pushProjectToGitHub(project) {
   const repoName = `${(project.name || 'mern-ai-project')
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '')
-    .slice(0, 40)}-${Date.now().toString().slice(-4)}`;
+    .slice(0, 40) || 'mern-ai-project'}-${Date.now().toString().slice(-4)}`;
 
   const githubApiBase = 'https://github.com';
 
@@ -45,10 +46,10 @@ export async function pushProjectToGitHub(project) {
   const owner = repoData.owner.login;
 
   for (const file of project.files || []) {
-    const cleanPath = file.path.replace(/^\/+/, '');
+    const cleanPath = String(file.path || '').replace(/^\/+/, '');
     if (!cleanPath) continue;
 
-    const base64Content = Buffer.from(file.code || '', 'utf-8').toString('base64');
+    const base64Content = Buffer.from(String(file.code || ''), 'utf-8').toString('base64');
 
     const fileRes = await fetch(
       `${githubApiBase}/repos/${owner}/${repoName}/contents/${cleanPath}`,
@@ -81,65 +82,69 @@ export async function deployProjectToVercel(project) {
     throw new Error('VERCEL_TOKEN missing in backend .env file');
   }
 
-  const vercelFiles = (project.files || []).map((file) => ({
-    file: file.path.replace(/^\/+/, ''),
-    data: file.code || '',
-  }));
+  const rawFiles = (project.files || [])
+    .map((file) => ({
+      file: String(file.path || '').replace(/^\/+/, ''),
+      data: String(file.code || ''),
+    }))
+    .filter((f) => f.file.length > 0);
 
-  const hasClient = vercelFiles.some((f) => f.file.startsWith('client/'));
-  const hasServer = vercelFiles.some((f) => f.file.startsWith('server/'));
-  const serverEntry = vercelFiles.find(
+  const hasClient = rawFiles.some((f) => f.file.startsWith('client/'));
+  const hasServer = rawFiles.some((f) => f.file.startsWith('server/'));
+  const serverEntry = rawFiles.find(
     (f) => f.file === 'server/server.js' || f.file === 'server/index.js'
   );
-  const hasVercelJson = vercelFiles.some((f) => f.file === 'vercel.json');
 
-  let projectSettings = {
-    framework: 'vite',
-    buildCommand: 'npm run build',
-    outputDirectory: 'dist',
-    installCommand: 'npm install',
-  };
+  let vercelFiles = [...rawFiles];
+  let payload = {};
+
+  const cleanName =
+    (project.name || 'mern-ai-app')
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 40) || 'mern-ai-app';
+
+  const deploymentName = `${cleanName}-${Date.now().toString().slice(-4)}`;
 
   if (hasClient && hasServer && serverEntry) {
-    projectSettings = {
-      framework: null,
-      buildCommand: 'cd client && npm install && npm run build',
-      outputDirectory: 'client/dist',
-      installCommand: 'cd server && npm install',
-    };
+    vercelFiles = vercelFiles.filter((f) => f.file !== 'vercel.json');
+    vercelFiles.push({
+      file: 'vercel.json',
+      data: JSON.stringify(
+        {
+          version: 2,
+          builds: [
+            { src: serverEntry.file, use: '@vercel/node' },
+            {
+              src: 'client/package.json',
+              use: '@vercel/static-build',
+              config: { distDir: 'dist' },
+            },
+          ],
+          routes: [
+            { src: '/api/(.*)', dest: `/${serverEntry.file}` },
+            { handle: 'filesystem' },
+            { src: '/(.*)', dest: '/client/dist/index.html' },
+          ],
+        },
+        null,
+        2
+      ),
+    });
 
-    if (!hasVercelJson) {
-      vercelFiles.push({
-        file: 'vercel.json',
-        data: JSON.stringify(
-          {
-            version: 2,
-            builds: [
-              { src: serverEntry.file, use: '@vercel/node' },
-              {
-                src: 'client/package.json',
-                use: '@vercel/static-build',
-                config: { distDir: 'dist' },
-              },
-            ],
-            routes: [
-              { src: '/api/(.*)', dest: `/${serverEntry.file}` },
-              { handle: 'filesystem' },
-              { src: '/(.*)', dest: '/client/dist/index.html' },
-            ],
-          },
-          null,
-          2
-        ),
-      });
-    }
+    payload = {
+      name: deploymentName,
+      files: vercelFiles,
+      target: 'production',
+    };
   } else {
     if (hasClient) {
-      vercelFiles.forEach((f) => {
-        if (f.file.startsWith('client/')) {
-          f.file = f.file.replace(/^client\//, '');
-        }
-      });
+      vercelFiles = vercelFiles.map((f) => ({
+        file: f.file.startsWith('client/') ? f.file.replace(/^client\//, '') : f.file,
+        data: f.data,
+      }));
     }
 
     const hasPackageJson = vercelFiles.some((f) => f.file === 'package.json');
@@ -186,47 +191,46 @@ export async function deployProjectToVercel(project) {
       });
     }
 
-    if (!hasVercelJson) {
-      vercelFiles.push({
-        file: 'vercel.json',
-        data: JSON.stringify(
-          {
-            rewrites: [{ source: '/(.*)', destination: '/index.html' }],
-          },
-          null,
-          2
-        ),
-      });
-    }
+    vercelFiles = vercelFiles.filter((f) => f.file !== 'vercel.json');
+    vercelFiles.push({
+      file: 'vercel.json',
+      data: JSON.stringify(
+        {
+          rewrites: [{ source: '/(.*)', destination: '/index.html' }],
+        },
+        null,
+        2
+      ),
+    });
+
+    payload = {
+      name: deploymentName,
+      files: vercelFiles,
+      target: 'production',
+      projectSettings: {
+        framework: 'vite',
+        buildCommand: 'npm run build',
+        outputDirectory: 'dist',
+        installCommand: 'npm install',
+      },
+    };
   }
 
-  const cleanName = (project.name || 'mern-ai-app')
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 40) || 'mern-ai-app';
-
-  const vercelDeployEndpoint = 'https://vercel.com';
-
-  const response = await fetch(vercelDeployEndpoint, {
+  const response = await fetch('https://vercel.com', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${vercelToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      name: `${cleanName}-${Date.now().toString().slice(-4)}`,
-      files: vercelFiles,
-      target: 'production',
-      projectSettings,
-    }),
+    body: JSON.stringify(payload),
   });
 
   const data = await safeParseJson(response);
   if (!response.ok) {
-    console.error('Vercel API Error:', JSON.stringify(data));
-    throw new Error(data.error?.message || JSON.stringify(data.error) || 'Vercel deployment failed');
+    const detailedError =
+      data.error?.message ||
+      (data.error ? JSON.stringify(data.error) : `HTTP ${response.status} from Vercel`);
+    throw new Error(`Vercel Error: ${detailedError}`);
   }
 
   return `https://${data.url}`;
