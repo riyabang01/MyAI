@@ -23,8 +23,8 @@ function App() {
   const checkLiveUrlStatus = async (url) => {
     if (!url) return false
     try {
-      const res = await fetch(url)
-      return res.ok
+      await fetch(url, { mode: 'no-cors' })
+      return true
     } catch {
       return false
     }
@@ -53,14 +53,13 @@ function App() {
     setSelectedProject(proj)
     setActiveTab('code')
     setGithubUrl(proj.githubUrl || '')
-    setLiveUrl('')
+    setLiveUrl(proj.liveUrl || '')
 
     if (proj.liveUrl) {
       const isAlive = await checkLiveUrlStatus(proj.liveUrl)
-      if (isAlive) {
-        setLiveUrl(proj.liveUrl)
-      } else {
+      if (!isAlive) {
         const updatedProj = { ...proj, liveUrl: '' }
+        setLiveUrl('')
         setSelectedProject(updatedProj)
         setProjects((prev) => prev.map((p) => (p._id === proj._id ? updatedProj : p)))
         axios.put(`${BACKEND_URL}/${proj._id}`, { manualFiles: proj.files, liveUrl: '' }).catch(() => {})
@@ -211,7 +210,7 @@ function App() {
           />
 
           {activeTab === 'preview' ? (
-            <LivePreview files={files} />
+            <LivePreview files={files} vercelUrl={liveUrl || selectedProject.liveUrl} />
           ) : (
             <CodeWorkspace
               files={files}

@@ -1,13 +1,24 @@
 import { buildLivePreviewHtml } from '../utils/projectActions'
 
-function LivePreview({ files }) {
+function LivePreview({ files, vercelUrl }) {
   return (
     <div className="bg-neutral-900 border border-neutral-800 rounded-2xl overflow-hidden">
-      <div className="px-4 py-2.5 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between">
+      <div className="px-4 py-2.5 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between gap-4">
         <span className="text-xs font-mono text-emerald-400">Live UI Sandbox Preview</span>
-        <span className="text-xs text-neutral-500">
-          Click "Deploy Live on Vercel" for live cloud hosting
-        </span>
+        {vercelUrl ? (
+          <a
+            href={vercelUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-mono text-blue-400 hover:underline truncate"
+          >
+            {vercelUrl}
+          </a>
+        ) : (
+          <span className="text-xs text-neutral-500">
+            Click "Deploy Live on Vercel" for live cloud hosting
+          </span>
+        )}
       </div>
       <iframe
         title="Live Project Preview"
