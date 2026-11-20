@@ -7,9 +7,10 @@ export async function pushProjectToGitHub(project) {
   const repoName = `${(project.name || 'mern-ai-project')
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
     .slice(0, 40)}-${Date.now().toString().slice(-4)}`;
 
-  const githubApiBase = ['https:/', '://github.com'].join('/');
+  const githubApiBase = 'https://github.com';
 
   const repoRes = await fetch(`${githubApiBase}/user/repos`, {
     method: 'POST',
@@ -35,6 +36,8 @@ export async function pushProjectToGitHub(project) {
 
   for (const file of project.files || []) {
     const cleanPath = file.path.replace(/^\/+/, '');
+    if (!cleanPath) continue;
+
     const base64Content = Buffer.from(file.code || '', 'utf-8').toString('base64');
 
     const fileRes = await fetch(
@@ -191,7 +194,7 @@ export async function deployProjectToVercel(project) {
     .replace(/[^a-z0-9-]/g, '-')
     .slice(0, 40);
 
-  const vercelDeployEndpoint = ['https:/', '://vercel.com', 'v13', 'deployments'].join('/');
+  const vercelDeployEndpoint = 'https://vercel.com';
 
   const response = await fetch(vercelDeployEndpoint, {
     method: 'POST',
