@@ -1,5 +1,14 @@
 import JSZip from 'jszip'
 
+const triggerVSCodeUri = (uri) => {
+  const link = document.createElement('a')
+  link.href = uri
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 export const downloadProjectZip = async (project) => {
   if (!project) return
   const zip = new JSZip()
@@ -27,7 +36,7 @@ export const openProjectInVSCode = async (project, githubUrl = '', onPushGithub 
 
   if (project.localPath) {
     const formattedPath = project.localPath.replace(/\\/g, '/')
-    window.location.href = `vscode://file/${formattedPath}`
+    triggerVSCodeUri(`vscode://file/${encodeURI(formattedPath)}`)
     return
   }
 
@@ -57,7 +66,18 @@ export const openProjectInVSCode = async (project, githubUrl = '', onPushGithub 
         await writable.close()
       }
 
-      window.location.href = 'vscode://'
+      const savedBasePath = localStorage.getItem('vscode_base_dir') || `C:/Users/YourName/Desktop`
+      const userBasePath = window.prompt(
+        `Project "${folderName}" save ho gaya hai!\nVS Code me direct kholne ke liye us parent folder ka full path confirm karein jise aapne abhi select kiya tha:`,
+        savedBasePath
+      )
+
+      if (userBasePath) {
+        const cleanBase = userBasePath.trim().replace(/\\/g, '/').replace(/\/+$/, '')
+        localStorage.setItem('vscode_base_dir', cleanBase)
+        const fullProjectPath = `${cleanBase}/${folderName}`
+        triggerVSCodeUri(`vscode://file/${encodeURI(fullProjectPath)}`)
+      }
       return
     } catch (err) {
       if (err.name === 'AbortError') return
@@ -79,7 +99,7 @@ export const openProjectInVSCode = async (project, githubUrl = '', onPushGithub 
   }
 
   const encodedUrl = encodeURIComponent(repoUrl)
-  window.location.href = `vscode://vscode.git/clone?url=${encodedUrl}`
+  triggerVSCodeUri(`vscode://vscode.git/clone?url=${encodedUrl}`)
 }
 
 export const buildLivePreviewHtml = (files) => {
@@ -100,7 +120,7 @@ export const buildLivePreviewHtml = (files) => {
 
   return (
     '<!DOCTYPE html><html><head><meta charset="UTF-8" />' +
-    '<script src="https://tailwindcss.com"></script>' +
+    '<script src="https://cdn.tailwindcss.com"></script>' +
     '<script src="https://unpkg.com" crossorigin></script>' +
     '<script src="https://unpkg.com" crossorigin></script>' +
     '<script src="https://unpkg.com"></script>' +
