@@ -23,6 +23,47 @@ export const downloadProjectZip = async (project) => {
 }
 
 export const openProjectInVSCode = async (project, githubUrl = '', onPushGithub = null) => {
+  if (!project) return
+
+  if (project.localPath) {
+    const formattedPath = project.localPath.replace(/\\/g, '/')
+    window.location.href = `vscode://file/${formattedPath}`
+    return
+  }
+
+  if ('showDirectoryPicker' in window) {
+    try {
+      const rootDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' })
+      const folderName = (project.name || 'mern-project')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+
+      const projectDirHandle = await rootDirHandle.getDirectoryHandle(folderName, { create: true })
+      const files = project.files || []
+
+      for (const file of files) {
+        const cleanPath = file.path.replace(/^\/+/, '')
+        const parts = cleanPath.split('/')
+        const fileName = parts.pop()
+
+        let currentDir = projectDirHandle
+        for (const part of parts) {
+          currentDir = await currentDir.getDirectoryHandle(part, { create: true })
+        }
+
+        const fileHandle = await currentDir.getFileHandle(fileName, { create: true })
+        const writable = await fileHandle.createWritable()
+        await writable.write(file.code || '')
+        await writable.close()
+      }
+
+      window.location.href = 'vscode://'
+      return
+    } catch (err) {
+      if (err.name === 'AbortError') return
+    }
+  }
+
   let repoUrl = githubUrl || project?.githubUrl
 
   if (!repoUrl && typeof onPushGithub === 'function') {
@@ -33,12 +74,12 @@ export const openProjectInVSCode = async (project, githubUrl = '', onPushGithub 
   }
 
   if (!repoUrl) {
-    alert('Please push the project to GitHub first to open it in VS Code.')
+    alert('Please select a folder or push the project to GitHub first to open it in VS Code.')
     return
   }
 
-  const cleanRepo = repoUrl.replace(/^https?:\/\//, '')
-  window.open('https://vscode.dev' + cleanRepo, '_blank', 'noopener,noreferrer')
+  const encodedUrl = encodeURIComponent(repoUrl)
+  window.location.href = `vscode://vscode.git/clone?url=${encodedUrl}`
 }
 
 export const buildLivePreviewHtml = (files) => {
@@ -59,7 +100,7 @@ export const buildLivePreviewHtml = (files) => {
 
   return (
     '<!DOCTYPE html><html><head><meta charset="UTF-8" />' +
-    '<script src="https://cdn.tailwindcss.com"></script>' +
+    '<script src="https://tailwindcss.com"></script>' +
     '<script src="https://unpkg.com" crossorigin></script>' +
     '<script src="https://unpkg.com" crossorigin></script>' +
     '<script src="https://unpkg.com"></script>' +
