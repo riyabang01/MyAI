@@ -11,11 +11,30 @@ import {
 export const getAllProjects = async (req, res) => {
   try {
     const projects = await Project.find().sort({ createdAt: -1 });
-    res.status(200).json(projects);
+
+    const verifiedProjects = await Promise.all(
+      projects.map(async (project) => {
+        if (project.liveUrl) {
+          try {
+            const response = await fetch(project.liveUrl, { method: 'HEAD' });
+            if (response.status === 404) {
+              project.liveUrl = '';
+              await project.save();
+            }
+          } catch (err) {
+            console.error(err);
+          }
+        }
+        return project;
+      })
+    );
+
+    res.status(200).json(verifiedProjects);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 export const createProject = async (req, res) => {
   try {
