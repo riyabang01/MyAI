@@ -11,21 +11,23 @@ import {
 export const getAllProjects = async (req, res) => {
   try {
     const projects = await Project.find().sort({ createdAt: -1 });
+    const vercelToken = process.env.VERCEL_TOKEN;
 
     const verifiedProjects = await Promise.all(
       projects.map(async (project) => {
-        if (project.liveUrl) {
+        if (project.liveUrl && vercelToken) {
           try {
-            const response = await fetch(project.liveUrl, {
-              method: 'GET',
-              headers: { 'User-Agent': 'Mozilla/5.0' },
-            });
-            const html = await response.text();
-            if (
-              response.status === 404 ||
-              html.includes('DEPLOYMENT_NOT_FOUND') ||
-              html.includes('404: NOT_FOUND')
-            ) {
+            const hostname = new URL(project.liveUrl).hostname;
+            const apiRes = await fetch(
+              `https://vercel.com{hostname}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${vercelToken}`,
+                },
+              }
+            );
+
+            if (apiRes.status === 404 || apiRes.status === 403 || apiRes.status === 410) {
               project.liveUrl = '';
               await project.save();
             }
@@ -42,6 +44,7 @@ export const getAllProjects = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 
 
