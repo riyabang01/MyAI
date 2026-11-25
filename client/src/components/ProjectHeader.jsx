@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { downloadProjectZip, openProjectInVSCode } from '../utils/projectActions';
 
 function ProjectHeader({
@@ -12,9 +13,36 @@ function ProjectHeader({
   onPushGithub,
   githubUrl,
   onDelete,
+  onRemoveLiveUrl,
 }) {
   const activeGithubUrl = githubUrl || project?.githubUrl;
-  const activeLiveUrl = liveUrl || project?.liveUrl;
+  const rawLiveUrl = liveUrl || project?.liveUrl;
+  const [isLiveValid, setIsLiveValid] = useState(Boolean(rawLiveUrl));
+
+  useEffect(() => {
+    if (!rawLiveUrl) {
+      setIsLiveValid(false);
+      return;
+    }
+
+    setIsLiveValid(true);
+
+    const verifyVercelDeployment = async () => {
+      try {
+        const response = await fetch(rawLiveUrl, { method: 'HEAD' });
+        if (response.status === 404) {
+          setIsLiveValid(false);
+          if (onRemoveLiveUrl) {
+            onRemoveLiveUrl(project._id);
+          }
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    verifyVercelDeployment();
+  }, [rawLiveUrl, project?._id, onRemoveLiveUrl]);
 
   return (
     <>
@@ -119,21 +147,21 @@ function ProjectHeader({
         </div>
       )}
 
-      {activeLiveUrl && (
+      {isLiveValid && rawLiveUrl && (
         <div className="mb-6 p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className="text-emerald-400 font-bold text-sm">🎉 Live on Vercel:</span>
             <a
-              href={activeLiveUrl}
+              href={rawLiveUrl}
               target="_blank"
               rel="noreferrer"
               className="text-sm font-mono text-emerald-300 underline hover:text-emerald-200"
             >
-              {activeLiveUrl}
+              {rawLiveUrl}
             </a>
           </div>
           <a
-            href={activeLiveUrl}
+            href={rawLiveUrl}
             target="_blank"
             rel="noreferrer"
             className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"

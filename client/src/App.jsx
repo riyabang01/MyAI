@@ -23,12 +23,27 @@ function App() {
   const checkLiveUrlStatus = async (url) => {
     if (!url) return false
     try {
-      await fetch(url, { mode: 'no-cors' })
+      const res = await fetch(url, { method: 'HEAD' })
+      if (res.status === 404) return false
       return true
     } catch {
-      return false
+      return true
     }
   }
+
+  const handleRemoveLiveUrl = async (projectId) => {
+    setLiveUrl('')
+    setSelectedProject((prev) => (prev && prev._id === projectId ? { ...prev, liveUrl: '' } : prev))
+    setProjects((prev) =>
+      prev.map((p) => (p._id === projectId ? { ...p, liveUrl: '' } : p))
+    )
+    try {
+      await axios.put(`${BACKEND_URL}/${projectId}`, { liveUrl: '' })
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
 
   useEffect(() => {
     axios
@@ -40,7 +55,7 @@ function App() {
             if (!proj.liveUrl) return proj
             const isAlive = await checkLiveUrlStatus(proj.liveUrl)
             if (isAlive) return proj
-            axios.put(`${BACKEND_URL}/${proj._id}`, { manualFiles: proj.files, liveUrl: '' }).catch(() => {})
+            axios.put(`${BACKEND_URL}/${proj._id}`, { manualFiles: proj.files, liveUrl: '' }).catch(() => { })
             return { ...proj, liveUrl: '' }
           })
         )
@@ -58,14 +73,11 @@ function App() {
     if (proj.liveUrl) {
       const isAlive = await checkLiveUrlStatus(proj.liveUrl)
       if (!isAlive) {
-        const updatedProj = { ...proj, liveUrl: '' }
-        setLiveUrl('')
-        setSelectedProject(updatedProj)
-        setProjects((prev) => prev.map((p) => (p._id === proj._id ? updatedProj : p)))
-        axios.put(`${BACKEND_URL}/${proj._id}`, { manualFiles: proj.files, liveUrl: '' }).catch(() => {})
+        await handleRemoveLiveUrl(proj._id)
       }
     }
   }
+
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -186,11 +198,11 @@ function App() {
       selectedProject.files && selectedProject.files.length > 0
         ? selectedProject.files
         : [
-            {
-              path: 'generated-code.txt',
-              code: selectedProject.generatedCode || selectedProject.code || 'No code available',
-            },
-          ]
+          {
+            path: 'generated-code.txt',
+            code: selectedProject.generatedCode || selectedProject.code || 'No code available',
+          },
+        ]
 
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans selection:bg-indigo-500 selection:text-white">
@@ -207,6 +219,8 @@ function App() {
             onPushGithub={handlePushToGithub}
             githubUrl={githubUrl}
             onDelete={handleDeleteProject}
+            onRemoveLiveUrl={handleRemoveLiveUrl}
+
           />
 
           {activeTab === 'preview' ? (
