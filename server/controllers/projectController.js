@@ -16,8 +16,16 @@ export const getAllProjects = async (req, res) => {
       projects.map(async (project) => {
         if (project.liveUrl) {
           try {
-            const response = await fetch(project.liveUrl, { method: 'HEAD' });
-            if (response.status === 404) {
+            const response = await fetch(project.liveUrl, {
+              method: 'GET',
+              headers: { 'User-Agent': 'Mozilla/5.0' },
+            });
+            const html = await response.text();
+            if (
+              response.status === 404 ||
+              html.includes('DEPLOYMENT_NOT_FOUND') ||
+              html.includes('404: NOT_FOUND')
+            ) {
               project.liveUrl = '';
               await project.save();
             }
@@ -34,6 +42,7 @@ export const getAllProjects = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
 
 
 export const createProject = async (req, res) => {

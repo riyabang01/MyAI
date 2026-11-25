@@ -18,66 +18,25 @@ function App() {
   const [pushingGithub, setPushingGithub] = useState(false)
   const [githubUrl, setGithubUrl] = useState('')
 
-  const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:5000/api/projects' : '/api/projects')
-
-  const checkLiveUrlStatus = async (url) => {
-    if (!url) return false
-    try {
-      const res = await fetch(url, { method: 'HEAD' })
-      if (res.status === 404) return false
-      return true
-    } catch {
-      return true
-    }
-  }
-
-  const handleRemoveLiveUrl = async (projectId) => {
-    setLiveUrl('')
-    setSelectedProject((prev) => (prev && prev._id === projectId ? { ...prev, liveUrl: '' } : prev))
-    setProjects((prev) =>
-      prev.map((p) => (p._id === projectId ? { ...p, liveUrl: '' } : p))
-    )
-    try {
-      await axios.put(`${BACKEND_URL}/${projectId}`, { liveUrl: '' })
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
+  const BACKEND_URL =
+    import.meta.env.VITE_BACKEND_URL ||
+    (import.meta.env.DEV ? 'http://localhost:5000/api/projects' : '/api/projects')
 
   useEffect(() => {
     axios
       .get(BACKEND_URL)
-      .then(async (res) => {
-        const list = Array.isArray(res.data) ? res.data : []
-        const verifiedList = await Promise.all(
-          list.map(async (proj) => {
-            if (!proj.liveUrl) return proj
-            const isAlive = await checkLiveUrlStatus(proj.liveUrl)
-            if (isAlive) return proj
-            axios.put(`${BACKEND_URL}/${proj._id}`, { manualFiles: proj.files, liveUrl: '' }).catch(() => { })
-            return { ...proj, liveUrl: '' }
-          })
-        )
-        setProjects(verifiedList)
+      .then((res) => {
+        setProjects(Array.isArray(res.data) ? res.data : [])
       })
       .catch((err) => console.error(err))
   }, [BACKEND_URL])
 
-  const openProject = async (proj) => {
+  const openProject = (proj) => {
     setSelectedProject(proj)
     setActiveTab('code')
     setGithubUrl(proj.githubUrl || '')
     setLiveUrl(proj.liveUrl || '')
-
-    if (proj.liveUrl) {
-      const isAlive = await checkLiveUrlStatus(proj.liveUrl)
-      if (!isAlive) {
-        await handleRemoveLiveUrl(proj._id)
-      }
-    }
   }
-
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -198,11 +157,11 @@ function App() {
       selectedProject.files && selectedProject.files.length > 0
         ? selectedProject.files
         : [
-          {
-            path: 'generated-code.txt',
-            code: selectedProject.generatedCode || selectedProject.code || 'No code available',
-          },
-        ]
+            {
+              path: 'generated-code.txt',
+              code: selectedProject.generatedCode || selectedProject.code || 'No code available',
+            },
+          ]
 
     return (
       <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans selection:bg-indigo-500 selection:text-white">
@@ -219,8 +178,6 @@ function App() {
             onPushGithub={handlePushToGithub}
             githubUrl={githubUrl}
             onDelete={handleDeleteProject}
-            onRemoveLiveUrl={handleRemoveLiveUrl}
-
           />
 
           {activeTab === 'preview' ? (
